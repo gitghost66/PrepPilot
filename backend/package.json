@@ -13,7 +13,8 @@
     "migrate:name": "tsx src/db/run-migration.ts 004_add_user_name.sql",
     "migrate:responses": "tsx src/db/run-migration.ts 005_responses_practice.sql",
     "migrate:day-status": "tsx src/db/run-migration.ts 006_roadmap_day_status.sql",
-    "migrate:practice-answers": "tsx src/db/run-migration.ts 007_practice_answers.sql"
+    "migrate:practice-answers": "tsx src/db/run-migration.ts 007_practice_answers.sql",
+    "migrate:notifications": "tsx src/db/run-migration.ts 008_notifications.sql"
   },
   "keywords": [],
   "author": "",

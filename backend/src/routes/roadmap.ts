@@ -3,6 +3,7 @@ import pool from '../db/pool';
 import { verifyToken, AuthRequest } from '../middleware/auth';
 import { generatePracticeContent } from '../services/practiceContent';
 import { scoreAnswer } from '../services/answerScoring';
+import { createNotification } from '../services/notifications';
 
 import { generateRoadmap, MIN_DAYS, MAX_DAYS } from '../services/roadmapGeneration';
 
@@ -309,6 +310,18 @@ router.post('/:dayId/complete', verifyToken, async (req: AuthRequest, res: Respo
 
     await client.query('COMMIT');
 
+    // Notify when completing this day actually unlocked the next one. Runs
+    // post-commit and best-effort, so it never blocks the completion response.
+    const unlocked = nextRes.rows[0];
+    if (unlocked) {
+      await createNotification(
+        userId,
+        'day_unlocked',
+        `Day ${unlocked.day_number} unlocked: ${unlocked.topic}`,
+        unlocked.id
+      );
+    }
+
     res.json({
       day: updatedRes.rows[0],
       next_day: nextRes.rows[0] ?? null,
@@ -350,7 +363,7 @@ router.post(
 
     try {
       const dayRes = await pool.query(
-        `SELECT q.id, q.status, q.practice_questions
+        `SELECT q.id, q.topic, q.status, q.practice_questions
          FROM questions q
          JOIN roadmaps r ON r.id = q.roadmap_id
          WHERE q.id = $1 AND r.user_id = $2`,
@@ -393,6 +406,16 @@ router.post(
          VALUES ($1, $2, $3, $4, 'web', $5, $6)
          RETURNING id, day_id, question_id, answer_text, source, ai_score, ai_feedback, created_at`,
         [userId, dayId, questionId, answerText, score, feedback]
+      );
+
+      // Notify the user their answer was scored. Best-effort, post-insert, so a
+      // notification failure never blocks the scored-answer response.
+      const scoreLabel = score == null ? '' : ` ${score}/10`;
+      await createNotification(
+        userId,
+        'answer_scored',
+        `Answer scored${scoreLabel} · ${day.topic}`,
+        String(dayId)
       );
 
       res.status(201).json(insertRes.rows[0]);

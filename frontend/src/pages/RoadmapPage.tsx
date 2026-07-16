@@ -199,7 +199,7 @@ function ProgressCard({ completed, total }: { completed: number; total: number }
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
-        15-Day Sprint
+        {total}-Day Sprint
       </p>
       <p className="text-2xl font-black text-gray-900 mb-3">
         <span className="text-emerald-600">{completed}</span>
