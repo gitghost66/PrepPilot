@@ -22,6 +22,9 @@ export interface RoadmapResponse {
   roadmap_id: string;
   interview_date: string;   // ISO date string, e.g. "2026-07-30"
   created_at: string;
+  // True when this plan wasn't built from the analysis currently on file —
+  // i.e. a newer analysis exists and regeneration hasn't succeeded since.
+  is_stale: boolean;
   completed_count: number;
   days: RoadmapDay[];
 }

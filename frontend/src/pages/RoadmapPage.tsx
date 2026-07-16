@@ -8,7 +8,7 @@ import {
   RoadmapResponse,
   CompleteDayResult,
 } from '../api/roadmap';
-import { ChevronRight, RefreshCw, Upload, Check, Lock, Sparkles, Loader2, CalendarDays } from 'lucide-react';
+import { ChevronRight, RefreshCw, Upload, Check, Lock, Sparkles, Loader2, CalendarDays, AlertTriangle } from 'lucide-react';
 import PracticeModal from '../components/PracticeModal';
 
 // ── Skeleton card ─────────────────────────────────────────────────────────────
@@ -97,20 +97,19 @@ function DayCard({
         onKeyDown={
           isCompleted
             ? (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onPractice(day);
-                }
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onPractice(day);
               }
+            }
             : undefined
         }
-        className={`flex-1 rounded-2xl border p-5 mb-4 transition-shadow hover:shadow-sm ${
-          isCompleted
+        className={`flex-1 rounded-2xl border p-5 mb-4 transition-shadow hover:shadow-sm ${isCompleted
             ? 'border-gray-100 bg-gray-50/70 cursor-pointer hover:border-emerald-200'
             : isToday
-            ? 'border-emerald-200 bg-white shadow-sm'
-            : 'border-gray-200 bg-white'
-        }`}
+              ? 'border-emerald-200 bg-white shadow-sm'
+              : 'border-gray-200 bg-white'
+          }`}
       >
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
@@ -126,9 +125,8 @@ function DayCard({
 
             {/* Topic title */}
             <h3
-              className={`font-semibold text-[15px] leading-snug mb-1 ${
-                isCompleted ? 'text-gray-500' : 'text-gray-900'
-              }`}
+              className={`font-semibold text-[15px] leading-snug mb-1 ${isCompleted ? 'text-gray-500' : 'text-gray-900'
+                }`}
             >
               {day.topic}
             </h3>
@@ -200,6 +198,9 @@ function ProgressCard({ completed, total }: { completed: number; total: number }
     <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
         {total}-Day Sprint
+
+
+
       </p>
       <p className="text-2xl font-black text-gray-900 mb-3">
         <span className="text-emerald-600">{completed}</span>
@@ -525,6 +526,30 @@ export default function RoadmapPage() {
           </button>
         </div>
       </div>
+
+      {/* ── Stale plan notice ──────────────────────────────────────────────── */}
+      {/* This plan predates the analysis on file — it was built from an older
+          resume/JD. Previously it rendered as though it were current. */}
+      {roadmap.is_stale && !showRegen && (
+        <div className="mb-8 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-900">
+              This plan is from an earlier analysis
+            </p>
+            <p className="mt-0.5 text-xs text-amber-800">
+              You've run a newer resume &amp; JD analysis since this roadmap was built, so
+              these topics may not match your current skill gaps.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowRegen(true)}
+            className="shrink-0 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
+          >
+            Rebuild
+          </button>
+        </div>
+      )}
 
       {/* ── Regenerate panel ───────────────────────────────────────────────── */}
       {showRegen && (

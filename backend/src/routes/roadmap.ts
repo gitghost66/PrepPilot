@@ -5,7 +5,13 @@ import { generatePracticeContent } from '../services/practiceContent';
 import { scoreAnswer } from '../services/answerScoring';
 import { createNotification } from '../services/notifications';
 
-import { generateRoadmap, MIN_DAYS, MAX_DAYS } from '../services/roadmapGeneration';
+import {
+  generateRoadmap,
+  loadCurrentAnalysis,
+  NoAnalysisError,
+  MIN_DAYS,
+  MAX_DAYS,
+} from '../services/roadmapGeneration';
 
 const router = Router();
 
@@ -15,11 +21,15 @@ router.get('/', verifyToken, async (req: AuthRequest, res: Response): Promise<vo
   const userId = req.userId!;
 
   try {
-    // Fetch the user's roadmap metadata
+    // Fetch the user's roadmap metadata, plus whether it was built from the
+    // analysis that's currently on file. They diverge when regeneration failed
+    // after a new upload and the previous plan was left in place.
     const roadmapRes = await pool.query(
-      `SELECT id, user_id, interview_date, created_at
-       FROM roadmaps
-       WHERE user_id = $1
+      `SELECT r.id, r.user_id, r.interview_date, r.created_at,
+              (r.analysis_uploaded_at IS DISTINCT FROM ud.uploaded_at) AS is_stale
+       FROM roadmaps r
+       LEFT JOIN user_documents ud ON ud.user_id = r.user_id
+       WHERE r.user_id = $1
        LIMIT 1`,
       [userId]
     );
@@ -48,6 +58,9 @@ router.get('/', verifyToken, async (req: AuthRequest, res: Response): Promise<vo
       roadmap_id: roadmapId,
       interview_date: roadmap.interview_date,
       created_at: roadmap.created_at,
+      // True when this plan doesn't match the analysis currently on file, so the
+      // UI can offer to regenerate instead of presenting it as up to date.
+      is_stale: roadmap.is_stale,
       completed_count,
       days: questionsRes.rows.map((row) => ({
         id: row.id,
@@ -88,10 +101,26 @@ router.post('/generate', verifyToken, async (req: AuthRequest, res: Response): P
     return;
   }
 
+  // Build from the user's current analysis. A missing/unusable analysis is a
+  // hard error — silently generating a generic syllabus is what made stale and
+  // irrelevant roadmaps indistinguishable from correct ones.
+  let analysis;
+  try {
+    analysis = await loadCurrentAnalysis(userId);
+  } catch (err) {
+    if (err instanceof NoAnalysisError) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
+    console.error('[roadmap] failed to load analysis:', err);
+    res.status(500).json({ error: 'Failed to load your analysis' });
+    return;
+  }
+
   // Generate first (outside the transaction — this is the slow, failure-prone part).
   let plan;
   try {
-    plan = await generateRoadmap(days);
+    plan = await generateRoadmap(days, analysis.context);
   } catch (err) {
     console.error('[roadmap] generate error:', err);
     res.status(502).json({ error: "Couldn't generate your roadmap. Please try again." });
@@ -110,14 +139,15 @@ router.post('/generate', verifyToken, async (req: AuthRequest, res: Response): P
 
     // One roadmap per user — upsert and replace its questions.
     const roadmapRes = await client.query(
-      `INSERT INTO roadmaps (user_id, topics, interview_date)
-       VALUES ($1, $2, $3)
+      `INSERT INTO roadmaps (user_id, topics, interview_date, analysis_uploaded_at)
+       VALUES ($1, $2, $3, $4::timestamptz)
        ON CONFLICT (user_id) DO UPDATE
          SET topics = EXCLUDED.topics,
              interview_date = EXCLUDED.interview_date,
+             analysis_uploaded_at = EXCLUDED.analysis_uploaded_at,
              created_at = NOW()
        RETURNING id, interview_date, created_at`,
-      [userId, JSON.stringify(plan), interviewDateStr]
+      [userId, JSON.stringify(plan), interviewDateStr, analysis.uploadedAt]
     );
     const roadmap = roadmapRes.rows[0];
     const roadmapId = roadmap.id as string;
@@ -154,6 +184,8 @@ router.post('/generate', verifyToken, async (req: AuthRequest, res: Response): P
       roadmap_id: roadmapId,
       interview_date: roadmap.interview_date,
       created_at: roadmap.created_at,
+      // Just built from the current analysis by definition.
+      is_stale: false,
       completed_count: 0,
       days: insertedDays.map((row) => ({
         id: row.id,
