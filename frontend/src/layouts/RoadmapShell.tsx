@@ -14,6 +14,7 @@ import {
   FileText,
 } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
+import ThemeToggle from '../components/ThemeToggle';
 import AboutModal from '../components/AboutModal';
 
 // ── Sidebar nav item ──────────────────────────────────────────────────────────
@@ -211,6 +212,7 @@ export default function RoadmapShell() {
           </div>
           {/* Action icons */}
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <NotificationBell />
             <button
               onClick={() => setShowAbout(true)}
