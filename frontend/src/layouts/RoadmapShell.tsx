@@ -17,6 +17,7 @@ import {
 import NotificationBell from '../components/NotificationBell';
 import ThemeToggle from '../components/ThemeToggle';
 import AboutModal from '../components/AboutModal';
+import { Toaster } from 'react-hot-toast';
 
 // ── Sidebar nav item ──────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ export default function RoadmapShell() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-['Inter',sans-serif]">
+      <Toaster position="bottom-right" />
 
       {/* ── Fixed Sidebar ──────────────────────────────────────────────────── */}
       <div className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${sidebarOpen ? 'w-[230px]' : 'w-0'}`}>
