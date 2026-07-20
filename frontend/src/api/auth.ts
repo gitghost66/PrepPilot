@@ -65,6 +65,18 @@ export const authApi = {
       body: JSON.stringify({ email, otp }),
     }),
 
+  requestSignupOTP: (email: string) =>
+    apiFetch<{ message: string }>('/auth/request-signup-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  verifySignupOTP: (email: string, otp: string) =>
+    apiFetch<{ message: string }>('/auth/verify-signup-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    }),
+
   resendOTP: (email: string) =>
     apiFetch<{ message: string }>('/auth/resend-otp', {
       method: 'POST',

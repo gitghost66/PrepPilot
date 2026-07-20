@@ -180,7 +180,7 @@ export default function LoginPage() {
                 <input
                   type="text"
                   maxLength={6}
-                  className="w-full px-4 py-3.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-xl tracking-[0.5em] font-semibold placeholder-gray-300 outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                  className="w-full px-4 py-3.5 rounded-xl bg-gray-50 border border-gray-200 text-black font-extrabold text-center text-xl tracking-[0.5em] placeholder-gray-300 outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   placeholder="------"
                   value={otp}
                   onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
