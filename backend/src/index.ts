@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
   origin: [
     process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
-    '://localhost:5174',
+    'http://localhost:5174',
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -55,6 +55,22 @@ app.get('/api/whatsapp/sandbox-info', (_req, res) => {
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
+});
+
+// ─── Global error handler ─────────────────────────────────────────────────────
+// Guarantees every failure — including malformed JSON bodies — returns a JSON
+// { error } shape instead of Express's default HTML error page.
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err?.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+    res.status(400).json({ error: 'Invalid JSON in request body' });
+    return;
+  }
+  if (err?.type === 'entity.too.large') {
+    res.status(413).json({ error: 'Request body is too large' });
+    return;
+  }
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────

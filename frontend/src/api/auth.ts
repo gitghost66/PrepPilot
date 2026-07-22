@@ -86,4 +86,23 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ email }),
     }),
+
+  // ── Forgot / reset password ──
+  forgotPassword: (email: string) =>
+    apiFetch<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  verifyResetOTP: (email: string, otp: string) =>
+    apiFetch<{ message: string }>('/auth/verify-reset-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    }),
+
+  resetPassword: (email: string, otp: string, newPassword: string) =>
+    apiFetch<{ success: boolean; message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, new_password: newPassword }),
+    }),
 };
