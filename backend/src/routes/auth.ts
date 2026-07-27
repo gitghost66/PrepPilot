@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import pool from '../db/pool';
-import { sendOTPVerificationEmail, sendPasswordResetEmail } from '../services/email';
+import { sendPasswordResetEmail } from '../services/email';
 import { validateEmail, validatePassword, normalizeEmail } from '../utils/validation';
 
 const router = Router();
@@ -33,96 +33,33 @@ function signToken(userId: string): string {
 
 // ─── SIGNUP WIZARD ──────────────────────────────────────────────────────────
 
-// Step 1: Request Signup OTP
+// (Stub) Step 1: Request Signup OTP — kept for API compatibility, no email sent
 router.post('/request-signup-otp', async (req: Request, res: Response): Promise<void> => {
   const emailCheck = validateEmail(req.body?.email);
   if (!emailCheck.valid) {
     res.status(400).json({ error: emailCheck.error });
     return;
   }
-
   const cleanEmail = normalizeEmail(req.body.email);
-
-  try {
-    // 1. Check if email already exists in users table
-    const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
-    if (userCheck.rows.length > 0) {
-      res.status(409).json({ error: 'An account with this email already exists.' });
-      return;
-    }
-
-    // 2. Generate OTP
-    const otpCode = crypto.randomInt(100000, 999999).toString();
-    const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    // 3. Upsert into email_verifications
-    await pool.query(
-      `INSERT INTO email_verifications (email, otp_code, otp_expires_at, is_verified)
-       VALUES ($1, $2, $3, FALSE)
-       ON CONFLICT (email) DO UPDATE 
-       SET otp_code = EXCLUDED.otp_code, 
-           otp_expires_at = EXCLUDED.otp_expires_at, 
-           is_verified = FALSE`,
-      [cleanEmail, otpCode, otpExpiresAt]
-    );
-
-    // 4. Send Email
-    await sendOTPVerificationEmail(cleanEmail, otpCode);
-
-    res.status(200).json({ message: 'OTP sent to email.' });
-  } catch (err) {
-    console.error('Request signup OTP error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Step 2: Verify Signup OTP
-router.post('/verify-signup-otp', async (req: Request, res: Response): Promise<void> => {
-  const { email, otp } = req.body;
-  if (!email || !otp) {
-    res.status(400).json({ error: 'Email and OTP are required' });
+  const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
+  if (userCheck.rows.length > 0) {
+    res.status(409).json({ error: 'An account with this email already exists.' });
     return;
   }
-
-  const cleanEmail = email.toLowerCase().trim();
-
-  try {
-    const result = await pool.query(
-      'SELECT otp_code, otp_expires_at, is_verified FROM email_verifications WHERE email = $1',
-      [cleanEmail]
-    );
-
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No pending verification found for this email.' });
-      return;
-    }
-
-    const record = result.rows[0];
-
-    if (record.otp_code !== otp) {
-      res.status(401).json({ error: 'Invalid verification code' });
-      return;
-    }
-
-    if (new Date() > new Date(record.otp_expires_at)) {
-      res.status(401).json({ error: 'Verification code has expired. Please request a new one.' });
-      return;
-    }
-
-    // Mark as verified
-    await pool.query(
-      'UPDATE email_verifications SET is_verified = TRUE WHERE email = $1',
-      [cleanEmail]
-    );
-
-    res.status(200).json({ message: 'Email verified successfully.' });
-  } catch (err) {
-    console.error('Verify signup OTP error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  res.status(200).json({ message: 'OTP sent to email.' });
 });
 
-// Step 3: Complete Signup
+// (Stub) Step 2: Verify Signup OTP — always succeeds (no email verification required)
+router.post('/verify-signup-otp', async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: 'Email is required' });
+    return;
+  }
+  res.status(200).json({ message: 'Email verified successfully.' });
+});
+
+// Step 3 (now direct): Complete Signup — creates user immediately, no email verification
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   const { email, password, name } = req.body ?? {};
 
@@ -140,18 +77,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   const cleanEmail = normalizeEmail(email);
 
   try {
-    // 1. Verify that the email is actually verified in email_verifications
-    const verifyCheck = await pool.query(
-      'SELECT is_verified FROM email_verifications WHERE email = $1',
-      [cleanEmail]
-    );
-
-    if (verifyCheck.rows.length === 0 || !verifyCheck.rows[0].is_verified) {
-      res.status(403).json({ error: 'Email is not verified.' });
-      return;
-    }
-
-    // 2. Hash password and insert user
+    // Hash password and insert user (is_verified = TRUE, no email gate)
     const passwordHash = await bcrypt.hash(password, 12);
 
     const result = await pool.query(
@@ -162,11 +88,6 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     );
 
     const user = result.rows[0];
-
-    // 3. Clean up the email_verifications table
-    await pool.query('DELETE FROM email_verifications WHERE email = $1', [cleanEmail]);
-
-    // 4. Log the user in
     const token = signToken(user.id);
     res.status(201).json({
       token,
@@ -278,50 +199,14 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
+// (Stub) Resend OTP — kept for API compatibility, no email sent
 router.post('/resend-otp', async (req: Request, res: Response): Promise<void> => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: 'Email is required' });
     return;
   }
-
-  try {
-    const otpCode = crypto.randomInt(100000, 999999).toString();
-    const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-
-    // This updates the users table (for existing unverified users from login)
-    // To also support resend from the new signup flow, we can check email_verifications too!
-    let targetEmail = email.toLowerCase().trim();
-    
-    // First try to update users table
-    const result = await pool.query(
-      'UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE email = $3 RETURNING email',
-      [otpCode, otpExpiresAt, targetEmail]
-    );
-
-    if (result.rows.length > 0) {
-      await sendOTPVerificationEmail(result.rows[0].email, otpCode);
-      res.status(200).json({ message: 'Verification code resent' });
-      return;
-    }
-
-    // If not in users, try email_verifications
-    const result2 = await pool.query(
-      'UPDATE email_verifications SET otp_code = $1, otp_expires_at = $2 WHERE email = $3 RETURNING email',
-      [otpCode, otpExpiresAt, targetEmail]
-    );
-
-    if (result2.rows.length > 0) {
-      await sendOTPVerificationEmail(result2.rows[0].email, otpCode);
-      res.status(200).json({ message: 'Verification code resent' });
-      return;
-    }
-
-    res.status(404).json({ error: 'Account not found' });
-  } catch (err) {
-    console.error('Resend OTP error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  res.status(200).json({ message: 'Verification code resent' });
 });
 
 // ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
